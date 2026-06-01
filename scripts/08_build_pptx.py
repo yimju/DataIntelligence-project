@@ -8,7 +8,11 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.ns import qn
-import os
+import os, json
+
+FIG = r"d:\data_intelligence_2\report\figs"
+with open(r"d:\data_intelligence_2\analysis\I1_metrics.json", encoding="utf-8") as f:
+    MET = json.load(f)
 
 # ---------------- palette & grid ----------------
 NAVY   = RGBColor(8, 31, 70)      # 제목 기본
@@ -96,6 +100,9 @@ def base(title, core=None, core_color=DGRAY, page=True, tag=None):
         tb, tf = textbox(s, SW-Inches(1.2), FOOT_TOP, Inches(0.9), Inches(0.3))
         para(tf, str(len(prs.slides._sldIdLst)), 10, color=PGRAY, align=PP_ALIGN.RIGHT, first=True, space_after=0)
     return s
+
+def img(slide, path, l, t, w=None, h=None):
+    return slide.shapes.add_picture(path, l, t, width=w, height=h)
 
 def caption(slide, text, l, t, w):
     tb, tf = textbox(slide, l, t, w, Inches(0.26))
@@ -192,8 +199,8 @@ rx = MARGIN+Inches(6.95); rw = CONTENT_W-Inches(6.95)
 card(s, rx, BODY_TOP, rw, Inches(2.30), "분석 5원칙(과제 지침)",
      ["① 비지도 알고리즘·설명가능","② 이산화·AOI·빈발패턴·연관규칙·서브스페이스",
       "③ 데이터 롤업 적극 활용","④ 국소 규칙은 전체에서 검증","⑤ 보조 규칙은 proj 이미지 참조"], accent=GREEN, bg=LIGHTG)
-card(s, rx, BODY_TOP+Inches(2.55), rw, Inches(2.10), "도메인 분포(999)",
-     ["교육 400건 (40.0%)","보건 300건 (30.0%)","공공행정 299건 (29.9%)","cate1×cate2 깔끔히 분리됨"], accent=NAVY)
+img(s, os.path.join(FIG,"fig_domain.png"), rx+Inches(0.15), BODY_TOP+Inches(2.55), w=rw-Inches(0.3))
+caption(s, "도메인(cate1) 분포 — scripts/09", rx+Inches(0.15), Inches(6.55), rw)
 
 # =================================================================
 # SLIDE 3 — 대상 데이터 구성 (상단요약 + 표)
@@ -244,15 +251,13 @@ bullets(s, [
 s = base("공통 데이터 준비 ② 1D 이산화", "멱법칙 수치를 log1p+KMeans로 설명가능한 순서형 구간으로 변환", core_color=DGRAY, tag="공통 전처리")
 bullets(s, [
     ("문제: rec_cnt가 1~833,466으로 극단적 멱법칙 → 그대로면 큰 값이 지배", 0),
-    ("절차: log1p 변환 → 1차원 KMeans(n_init=10) → 군집중심 정렬로 순서 라벨", 0),
-    ("설명가능성: 각 구간을 원척도 [min~max]로 환원해 사람이 읽도록 함", 0),
-], w=Inches(6.6))
-data=[["변수","구간(원척도, n)"],
- ["레코드수","극소[1-22]·소[23-130]·중[133-829]·대[843-8019]·극대[8578-833466]"],
- ["컬럼폭","협소[1-5]·표준[6-11]·광폭[12-44]·초광폭[49-338]"],
- ["수치비","범주우세[0-.23]·혼합[.23-.58]·수치우세[.60-1.0]"]]
-table(s, data, MARGIN, BODY_TOP+Inches(2.55), CONTENT_W, Inches(1.9), col_w=[1.3,6.7], fs=11, hfs=12)
-caption(s, "KMeans 경계는 데이터 구동, 라벨은 중심 오름차순 매핑 — scripts/04·06", MARGIN, Inches(6.6), CONTENT_W)
+    ("절차: log1p 변환 → 1차원 KMeans(n_init=10) → 중심 정렬로 순서 라벨", 0),
+    ("설명가능: 각 구간을 원척도 [min~max]로 환원(우측 초록선=경계)", 0),
+    ("레코드수: 극소[1-22]·소[23-130]·중[133-829]·대[843-8019]·극대[8578~]", 0),
+    ("컬럼폭: 협소[1-5]·표준[6-11]·광폭[12-44]·초광폭[49-338]", 0),
+], w=Inches(5.3), size=14)
+img(s, os.path.join(FIG,"fig_disc_rec.png"), MARGIN+Inches(5.5), BODY_TOP+Inches(0.3), w=Inches(7.1))
+caption(s, "레코드수 분포와 KMeans 이산화 경계 — scripts/09", MARGIN+Inches(5.5), Inches(6.4), Inches(7.1))
 
 # 7: AOI 롤업
 s = base("공통 데이터 준비 ③ AOI 롤업", "999개 자유 기관명과 컬럼명을 상위 개념으로 일반화하여 패턴 가시화", core_color=DGRAY, tag="공통 전처리")
@@ -263,8 +268,8 @@ bullets(s, [
     ("동의어 병합(연번≈순번)은 의도적 미적용 — BI 규칙 오염 방지(별도 G3)", 1),
     ("효과: 빈발패턴이 통계적 의미를 갖도록 차원 축약", 0),
 ], w=Inches(6.6))
-card(s, MARGIN+Inches(6.85), BODY_TOP, CONTENT_W-Inches(6.85), Inches(3.9), "기관유형 분포(AOI 결과)",
-     ["기초지자체 404","공공기관 245","미상(소스) 145","광역지자체 83","교육기관 49","중앙행정 39","기타 34"], accent=GREEN, bg=LIGHTG)
+img(s, os.path.join(FIG,"fig_aoi.png"), MARGIN+Inches(6.75), BODY_TOP+Inches(0.5), w=CONTENT_W-Inches(6.75))
+caption(s, "table_source→기관유형 AOI 롤업 결과(초록=미상) — scripts/09", MARGIN+Inches(6.75), Inches(6.4), CONTENT_W-Inches(6.75))
 
 # 8: 트랜잭션/FP-Growth/검증
 s = base("공통 데이터 준비 ④ 트랜잭션·패턴·검증", "테이블을 거래로 보고 두 종류 아이템으로 FP-Growth·연관규칙·검증 수행", core_color=DGRAY, tag="공통 전처리")
@@ -368,22 +373,22 @@ issue("인텔리전스 스키마 패밀리",
   "패밀리 커버리지·결측 분석"],
  core_color=GREEN, tag="인텔리전스")
 
-# I-연관규칙
-s = base("인텔리전스 흥미로운 연관규칙", "‘주말>기저귀>맥주’ 대응 — 컬럼 동시출현 규칙으로 데이터 구조 지문 도출", core_color=GREEN, tag="인텔리전스")
-data=[["주제","규칙","conf","lift"],
- ["지리좌표","경도 → 위도","1.00","22.7"],
- ["기간쌍","교육시작일 → 교육종료일","1.00","90.8"],
- ["행정구역","시도명 → 시군구명","0.94","39.0"],
- ["인구통계","연령대 → 성별","0.85","35.2"],
- ["교육스키마","교과목코드 ↔ 분반","1.00","124.9"],
- ["사학재정","연구비 → {일반·지정기부금}","1.00","111.0"]]
-table(s, data, MARGIN, BODY_TOP, Inches(7.0), Inches(3.5), col_w=[1.4,3.6,1.0,1.0], fs=12, hfs=12)
-caption(s, "전체 999, lift>2, 실제 테이블 추적 가능 — analysis/I1_REPORT.md §4", MARGIN, Inches(6.4), Inches(7.0))
-rx=MARGIN+Inches(7.25); rw=CONTENT_W-Inches(7.25)
-card(s, rx, BODY_TOP, rw, Inches(2.0), "읽는 법(예)",
-     ["‘경도’ 있으면 거의 100% ‘위도’ 동반","그 동반은 우연 대비 22.7배 흔함","→ 시각화형 POI 데이터셋의 식별 신호"], accent=NAVY)
-card(s, rx, BODY_TOP+Inches(2.2), rw, Inches(1.95), "대책·추가분석",
-     ["규칙 기반 스키마 자동태깅·무결성 체크","좌표/기간/주소 쌍 결측 검증","max_len↑·저support 규칙 도메인 확인"], accent=GREEN, bg=LIGHTG)
+# I-연관규칙 (상세 지표 표, full-width)
+s = base("인텔리전스 흥미로운 연관규칙 — 상세 지표", "‘주말>기저귀>맥주’ 대응 — 이슈 패턴 10건의 전체 지표(N=999)", core_color=GREEN, tag="인텔리전스")
+hdr=["주제","규칙(선행→후행)","#테이블","support","conf","lift","leverage","conviction"]
+rows=[hdr]
+for r in MET["issue_rules"]:
+    rows.append([r["topic"], f"{r['ante']}→{r['cons']}", r["cnt"], f"{r['supp']:.3f}",
+                 f"{r['conf']:.2f}", f"{r['lift']:.1f}", f"{r['lev']:.4f}", "∞" if r["conv"] is None else f"{r['conv']:.1f}"])
+table(s, rows, MARGIN, BODY_TOP, CONTENT_W, Inches(4.3),
+      col_w=[1.4,4.0,0.95,1.05,0.9,0.9,1.15,1.2], fs=10.5, hfs=10.5)
+caption(s, "support=동시출현비율 · conf=P(후행│선행) · lift=우연대비배수 · leverage=관측−독립 · conviction=함의강도(∞=예외0) · scripts/09", MARGIN, Inches(6.5), CONTENT_W)
+
+# I-연관규칙 시각화 (lift bar + scatter)
+s = base("인텔리전스 연관규칙 시각화", "이슈 규칙의 lift 크기와 전체 규칙군 내 위치(support–lift)", core_color=GREEN, tag="인텔리전스")
+img(s, os.path.join(FIG,"fig_rules_lift.png"), MARGIN, BODY_TOP+Inches(0.15), w=Inches(6.5))
+img(s, os.path.join(FIG,"fig_scatter.png"), MARGIN+Inches(6.9), BODY_TOP+Inches(0.35), w=Inches(5.5))
+caption(s, "좌: 이슈 규칙 lift / 우: 전체 컬럼규칙의 support–lift 산점(초록=이슈) — scripts/09", MARGIN, Inches(6.55), CONTENT_W)
 
 # I-재식별 위험 (G7)
 issue("인텔리전스·거버넌스 교차도메인 재식별 위험",
@@ -402,22 +407,48 @@ issue("인텔리전스·거버넌스 교차도메인 재식별 위험",
   "도메인 횡단 식별자 전수 인벤토리"],
  core_color=GREEN, tag="인텔리전스·거버넌스")
 
-# I-규칙#4 검증
-issue("규칙#4 국소→전체 검증",
- "국소에서 강했던 규칙이 전체에서 약화·비대칭됨을 실증함",
- ["도메인별 국소 채굴 후 전체 999건 재계산(verify)",
-  "국소·전체 support·conf·lift 병기",
-  "방향성(A→B vs B→A) 비대칭 점검"],
- ["소재지도로명→지번: 공공행정 1.00 → 전체 0.44 약화",
-  "보건은 지번주소 단독 보유 多 → 방향 붕괴",
-  "보건 일부는 데이터 명세서(사전) 파일=오분류 후보"],
- ["규칙 일반화 전 전체검증 의무화",
-  "카탈로그 오분류(명세서 vs 실데이터) 재분류",
-  "방향성 규칙은 양방향 모두 표기"],
- ["명세서 의심 테이블 별도 군집·식별",
-  "비대칭 규칙 전수 점검",
-  "도메인별 규칙 안정성 모니터링"],
- core_color=GREEN, tag="검증")
+# I-규칙#4 검증 (chart-left + bullets-right)
+s = base("규칙#4 국소→전체 검증", "국소에서 강했던 규칙이 전체에서 약화·비대칭됨을 실증함", core_color=GREEN, tag="검증")
+img(s, os.path.join(FIG,"fig_rule4.png"), MARGIN, BODY_TOP+Inches(0.35), w=Inches(6.0))
+caption(s, "국소(공공행정) vs 전체(999) confidence — scripts/09", MARGIN, Inches(6.45), Inches(6.0))
+rx=MARGIN+Inches(6.35); rw=CONTENT_W-Inches(6.35)
+card(s, rx, BODY_TOP, rw, Inches(2.35), "의미 분석",
+     ["소재지도로명→지번: 공공행정 1.00 → 전체 0.44 약화","보건은 지번주소 단독 보유 多 → 방향 붕괴",
+      "역방향(지번→도로명)은 0.92로 유지=비대칭","보건 일부는 데이터 명세서(사전) 파일=오분류 후보"], accent=NAVY)
+card(s, rx, BODY_TOP+Inches(2.55), rw, Inches(2.0), "대책·추가 분석",
+     ["규칙 일반화 전 전체검증 의무화","카탈로그 오분류(명세서 vs 실데이터) 재분류",
+      "방향성 규칙은 양방향 모두 표기·점검","명세서 의심 테이블 별도 군집·식별"], accent=GREEN, bg=LIGHTG)
+
+# =================================================================
+# APPENDIX A — 추가 컬럼 연관규칙
+# =================================================================
+s = base("Appendix A 추가 컬럼 연관규칙", "주요 이슈에 포함되지 않은 추가 동시출현 패턴(lift順·대칭/동일집합 제거)", core_color=DGRAY, tag="APPENDIX")
+rows=[["규칙(선행→후행)","#테이블","support","conf","lift","leverage","conv"]]
+for r in MET["appendix_basket"][:14]:
+    rows.append([r["rule"], r["cnt"], f"{r['supp']:.3f}", f"{r['conf']:.2f}", f"{r['lift']:.1f}",
+                 f"{r['lev']:.4f}", str(r["conv"])])
+table(s, rows, MARGIN, BODY_TOP, CONTENT_W, Inches(4.45), col_w=[5.0,1.0,1.05,0.9,0.9,1.1,0.85], fs=10, hfs=10.5)
+caption(s, "신규 주제: 기간쌍·도서관(출판사·저자·서명)·감염병통계(확진자→사망자)·학교설립·사업장 — scripts/09", MARGIN, Inches(6.6), CONTENT_W)
+
+# =================================================================
+# APPENDIX B — 속성 규칙 + 스키마 패밀리
+# =================================================================
+s = base("Appendix B 속성 규칙·스키마 패밀리", "테이블 속성 비자명 규칙과 최대빈발 컬럼군(추가)", core_color=DGRAY, tag="APPENDIX")
+rows=[["테이블 속성 규칙(비자명, conf≥0.6)","support","conf","lift"]]
+for r in MET["appendix_attr"][:8]:
+    rows.append([r["rule"], f"{r['supp']:.3f}", f"{r['conf']:.2f}", f"{r['lift']:.1f}"])
+table(s, rows, MARGIN, BODY_TOP, Inches(7.0), Inches(4.0), col_w=[4.6,0.9,0.8,0.8], fs=9.5, hfs=10)
+caption(s, "속성 연관규칙 — scripts/09", MARGIN, Inches(6.2), Inches(7.0))
+fam=[["스키마 패밀리(컬럼군)","#tbl","도메인"],
+ ["{순번,의료기관명,의료기관전화,의료기관주소}","11","보건"],
+ ["{경도,위도,도로명주소,전화번호}","10","보건/교육/행정"],
+ ["{연도,직종,회차}","9","보건"],
+ ["{소재지전화,업소명,업종명}","9","보건"],
+ ["{데이터기준일자,시군구명,시도명}","9","교육"],
+ ["{우편번호,전화번호,주소}","8","교육"],
+ ["{관리기관명,관리기관전화,데이터기준일자}","8","공공행정"]]
+table(s, fam, MARGIN+Inches(7.25), BODY_TOP, CONTENT_W-Inches(7.25), Inches(4.0), col_w=[3.9,0.7,1.4], fs=9.5, hfs=10)
+caption(s, "FP-Growth 최대빈발 항목집합(≥8테이블) — analysis/I1_synthesis.md", MARGIN+Inches(7.25), Inches(6.2), CONTENT_W-Inches(7.25))
 
 # =================================================================
 # SLIDE — 종합 시사점 & 로드맵
