@@ -1,0 +1,19 @@
+# 대용량 원천 데이터 (커밋 금지)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# PPT 미리보기 렌더(임시)
+report/preview/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
