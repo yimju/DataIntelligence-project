@@ -11,6 +11,8 @@ env/
 
 # PPT 미리보기 렌더(임시)
 report/preview/
+# PowerPoint 열림 잠금파일(커밋 금지)
+~$*
 
 # OS / IDE
 .DS_Store
