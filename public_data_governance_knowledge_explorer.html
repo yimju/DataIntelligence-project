@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>공공데이터 정밀데이터지도 기반 데이터 거버넌스 지식 탐사</title>
+<style>
+:root{
+  --bg:#f6f8fb;--card:#fff;--ink:#111827;--muted:#64748b;--line:#e5e7eb;
+  --navy:#111827;--blue:#2563eb;--green:#16a34a;--amber:#d97706;--red:#dc2626;--purple:#7c3aed;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:28px 34px;background:linear-gradient(135deg,#0f172a,#1e40af);color:white}
+header h1{margin:0 0 8px;font-size:27px;line-height:1.25}
+header p{margin:0;color:#dbeafe;line-height:1.65}
+main{max-width:1320px;margin:0 auto;padding:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(15,23,42,.06);padding:20px;margin:16px 0}
+h2{margin:0 0 14px;font-size:21px} h3{margin:18px 0 8px;font-size:17px}
+.notice{border-left:5px solid var(--blue);background:#eff6ff;padding:14px;border-radius:12px;line-height:1.7}
+.warn{border-left-color:var(--amber);background:#fffbeb}.ok{border-left-color:var(--green);background:#f0fdf4}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metric{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:14px}
+.metric b{font-size:24px;display:block}.metric span{font-size:13px;color:var(--muted)}
+input[type=file]{display:block;margin:12px 0;padding:10px;background:white;border:1px dashed #94a3b8;border-radius:12px;width:100%}
+input[type=number]{padding:8px;border:1px solid #cbd5e1;border-radius:8px}
+button{border:0;border-radius:12px;padding:11px 16px;background:var(--blue);color:white;font-weight:800;cursor:pointer;margin:4px}
+button.secondary{background:#475569}button.ghost{background:#eef2ff;color:#1e40af}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
+.tabs button{background:#e5e7eb;color:#111827}.tabs button.active{background:#111827;color:white}
+.tab{display:none}.tab.active{display:block}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;background:white}
+th,td{border:1px solid var(--line);padding:9px;vertical-align:top}
+th{background:#f1f5f9;text-align:left}
+.wrap{white-space:normal;word-break:break-word}
+.pill{display:inline-block;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:800;margin:2px;background:#e5e7eb}
+.blue{background:#dbeafe;color:#1e40af}.green{background:#dcfce7;color:#166534}.amber{background:#fef3c7;color:#92400e}
+.red{background:#fee2e2;color:#991b1b}.purple{background:#ede9fe;color:#5b21b6}.gray{background:#f1f5f9;color:#475569}
+pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e5e7eb;padding:16px;border-radius:14px;line-height:1.65}
+.small{font-size:12px;color:var(--muted);line-height:1.5}
+.progress{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0}
+.progress>div{height:100%;width:0%;background:#2563eb;transition:width .2s}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){main{padding:12px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>공공데이터 정밀데이터지도 기반 데이터 거버넌스 지식 탐사</h1>
+  <p>공공데이터포털 1,000개 테이블의 정밀데이터지도 데이터를 분석하여 컬럼 도메인/값 정합성, 도메인/값 연관성, 대표 도메인, 테이블 연계, PK/FK 후보, 업무규칙 후보를 도출합니다.</p>
+</header>
+
+<main>
+<section class="card">
+  <h2>1. 분석 파일 선택</h2>
+  <div class="notice">
+    <b>프로젝트 목적</b><br>
+    이 분석기는 정밀데이터지도 데이터를 대상으로 <b>데이터 거버넌스 지식</b>을 탐사합니다.
+    결과는 표준 도메인 사전 후보, 컬럼 표준화 후보, 값 정합성 규칙 후보, 테이블 연계 후보, 마스터 테이블 후보, 업무규칙 후보로 정리됩니다.
+  </div>
+  <input id="files" type="file" multiple accept=".csv,.txt">
+  <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin:12px 0">
+    <h3 style="margin-top:0">대용량 안전 설정</h3>
+    <label class="small">샘플 구간별 읽기 용량 MB</label>
+    <input id="maxMB" type="number" value="80" min="5" max="300">
+    <label class="small" style="margin-left:14px">파일별 최대 파싱 행</label>
+    <input id="maxRows" type="number" value="60000" min="1000" max="300000">
+    <div class="small">대용량 파일은 앞·중간·뒤 구간을 각각 지정 MB만큼 층화 샘플링합니다. 기본 80MB이면 파일당 최대 240MB를 분석합니다.</div>
+  </div>
+  <button onclick="run()">분석 실행</button>
+  <button class="secondary" onclick="downloadReport()">HTML 보고서 저장</button>
+  <button class="ghost" onclick="resetAll()">초기화</button>
+  <div class="progress"><div id="bar"></div></div>
+  <div id="log" class="small"></div>
+</section>
+
+<section class="card" id="summaryCard" style="display:none">
+  <h2>2. 분석 요약</h2>
+  <div class="grid" id="metrics"></div>
+</section>
+
+<section class="card" id="resultCard" style="display:none">
+  <div class="tabs" id="tabs"></div>
+  <div id="tabContents"></div>
+</section>
+</main>
+
+<script>
+let RESULT=null;
+
+const DOMAIN_RULES=[
+  {domain:"지역/주소", keys:["주소","지역","시도","시군구","읍면동","행정동","법정동","위도","경도","좌표","소재지","도로명","지번","구역","권역","광역","기초","위치"]},
+  {domain:"시간/기준일", keys:["일자","날짜","년월","연월","시점","기준일","기준연도","년도","월","분기","시간","시각","기간","갱신","등록일","수정일","작성일","조사일"]},
+  {domain:"기관/시설", keys:["기관","시설","센터","학교","병원","관서","공공","사업소","지점","부서","업체","단체","법인","관리기관","제공기관","운영기관","시설명"]},
+  {domain:"코드/분류", keys:["코드","분류","유형","구분","종류","등급","상태","항목","카테고리","대분류","중분류","소분류","식별","ID","번호","순번","키"]},
+  {domain:"수요/실적", keys:["인원","건수","수량","횟수","이용","방문","민원","실적","수요","금액","비용","요금","점수","평점","발생","신청","처리","통계"]},
+  {domain:"개인/민감", keys:["성명","이름","주민","전화","휴대","이메일","생년","성별","나이","연령","개인","환자","장애","소득","차량번호"]},
+  {domain:"값/속성", keys:["값","내용","명칭","설명","비고","여부","상세","속성","컬럼","필드","단위"]},
+];
+
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
+function fmt(n){return Number(n||0).toLocaleString("ko-KR")}
+function pill(t,c="gray"){return `<span class="pill ${c}">${esc(t)}</span>`}
+function log(s){$("log").innerHTML += `<div>${esc(s)}</div>`}
+function setBar(p){$("bar").style.width=Math.max(0,Math.min(100,p))+"%"}
+function resetAll(){RESULT=null;$("log").innerHTML="";$("summaryCard").style.display="none";$("resultCard").style.display="none";$("metrics").innerHTML="";$("tabs").innerHTML="";$("tabContents").innerHTML="";setBar(0)}
+
+function parseCSV(text, maxRows=60000){
+  text=String(text||"").replace(/^\uFEFF/,"");
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i], nx=text[i+1];
+    if(q){
+      if(ch=='"' && nx=='"'){cell+='"';i++}
+      else if(ch=='"'){q=false}
+      else cell+=ch;
+    }else{
+      if(ch=='"') q=true;
+      else if(ch==','){row.push(cell);cell=""}
+      else if(ch=='\n'){row.push(cell); rows.push(row); row=[]; cell=""; if(rows.length>=maxRows+1) break}
+      else if(ch=='\r'){}
+      else cell+=ch;
+    }
+  }
+  if((cell.length||row.length) && rows.length<maxRows+1){row.push(cell);rows.push(row)}
+  if(!rows.length) return {headers:[], data:[]}
+  const headers=rows[0].map((h,i)=>String(h||`col_${i+1}`).trim())
+  const data=rows.slice(1).filter(r=>r.some(x=>String(x||"").trim()!=="")).map(r=>{
+    const o={}; headers.forEach((h,i)=>o[h]=r[i]??""); return o
+  })
+  return {headers,data}
+}
+
+function readBlobAsText(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader()
+    reader.onload=()=>resolve(String(reader.result||""))
+    reader.onerror=()=>reject(reader.error)
+    reader.readAsText(blob,"utf-8")
+  })
+}
+function trimLines(text, trimHead=false, trimTail=true){
+  let s=String(text||"")
+  if(trimHead){const i=s.search(/\r|\n/); if(i>0 && i<s.length-1) s=s.slice(i+1)}
+  if(trimTail){const i=Math.max(s.lastIndexOf("\n"),s.lastIndexOf("\r")); if(i>0) s=s.slice(0,i)}
+  return s
+}
+async function readSegment(file,start,end,trimHead,trimTail){
+  const t=await readBlobAsText(file.slice(Math.max(0,start),Math.min(file.size,end)))
+  return trimLines(t,trimHead,trimTail)
+}
+async function readStratified(file,segBytes){
+  if(file.size<=segBytes){
+    return {text:await readSegment(file,0,file.size,false,false),segments:[{name:"전체",start:0,end:file.size}]}
+  }
+  const size=file.size, seg=Math.min(segBytes,size)
+  const raw=[
+    {name:"앞",start:0,end:seg,trimHead:false,trimTail:true},
+    {name:"중간",start:Math.max(0,Math.floor(size/2-seg/2)),end:Math.max(0,Math.floor(size/2-seg/2))+seg,trimHead:true,trimTail:true},
+    {name:"뒤",start:Math.max(0,size-seg),end:size,trimHead:true,trimTail:false}
+  ].sort((a,b)=>a.start-b.start)
+  const segments=[]
+  for(const s0 of raw){
+    const s={...s0}; const prev=segments[segments.length-1]
+    if(prev && s.start<prev.end){ if(s.end<=prev.end) continue; s.start=prev.end; s.trimHead=true }
+    if(s.end>s.start) segments.push(s)
+  }
+  const parts=[]
+  for(const s of segments){ parts.push(await readSegment(file,s.start,s.end,s.trimHead,s.trimTail)) }
+  return {text:parts.join("\n"),segments:segments.map(s=>({name:s.name,start:s.start,end:s.end}))}
+}
+
+function pickField(headers,cands){
+  for(const c of cands){
+    const f=headers.find(h=>String(h).toLowerCase()===c.toLowerCase() || String(h).includes(c))
+    if(f) return f
+  }
+  return null
+}
+function getAny(row,fields){for(const f of fields){if(f && row[f]!=null && String(row[f]).trim()!=="") return String(row[f]).trim()} return ""}
+function inferDomain(text){
+  const t=String(text||"").toLowerCase()
+  let best={domain:"일반",score:0,hit:[]}
+  for(const r of DOMAIN_RULES){
+    let score=0, hit=[]
+    for(const k of r.keys){if(t.includes(String(k).toLowerCase())){score++;hit.push(k)}}
+    if(score>best.score) best={domain:r.domain,score,hit}
+  }
+  return best
+}
+function valueProfile(values){
+  const sample=values.filter(v=>String(v||"").trim()!=="").slice(0,100).map(v=>String(v).trim())
+  const joined=sample.join(" "), total=sample.length||1
+  const date=sample.filter(v=>/\d{4}[-./년]?\s?\d{1,2}?/.test(v)).length/total
+  const num=sample.filter(v=>/^-?\d+(\.\d+)?$/.test(v.replace(/,/g,''))).length/total
+  const code=sample.filter(v=>/^[A-Za-z0-9_-]{2,30}$/.test(v) && (/[A-Za-z]/.test(v)||/\d/.test(v))).length/total
+  const addr=/시|군|구|동|로|길|번지|읍|면/.test(joined)
+  const unique=new Set(sample).size
+  let type="문자형"
+  if(date>.35) type="날짜형"; else if(num>.55) type="숫자형"; else if(addr) type="주소형"; else if(code>.45) type="코드형"; else if(unique<=10&&sample.length>=10) type="범주형"
+  return {type,unique,examples:[...new Set(sample)].slice(0,8)}
+}
+function canon(s){return String(s||"").replace(/[ _\-.]/g,"").replace(/명$|코드$|번호$|id$/ig,"").toLowerCase()}
+
+async function readFiles(files){
+  const maxMB=Math.max(5,Number($("maxMB").value||80)), maxRows=Math.max(1000,Number($("maxRows").value||60000))
+  const segBytes=maxMB*1024*1024, parsed=[]
+  for(let i=0;i<files.length;i++){
+    const f=files[i], mb=(f.size/1024/1024).toFixed(1)
+    log(`읽기: ${f.name} / 전체 ${mb}MB / 앞·중간·뒤 각 ${maxMB}MB`)
+    try{
+      const pack=await readStratified(f,segBytes)
+      const readBytes=pack.segments.reduce((a,s)=>a+s.end-s.start,0)
+      const segText=pack.segments.map(s=>`${s.name}:${(s.start/1024/1024).toFixed(1)}~${(s.end/1024/1024).toFixed(1)}MB`).join(" / ")
+      log(` → 분석 구간: ${segText}`)
+      const p=parseCSV(pack.text,maxRows)
+      parsed.push({file:f.name,size:f.size,readBytes,sampled:f.size>segBytes,segments:segText,headers:p.headers,data:p.data})
+      log(` → 헤더 ${p.headers.length}개, 파싱 행 ${p.data.length}개`)
+    }catch(e){
+      log(` → 오류: ${f.name} / ${e.message||e}`)
+      parsed.push({file:f.name,size:f.size,readBytes:0,sampled:true,segments:"오류",headers:[],data:[],error:String(e.message||e)})
+    }
+    setBar(((i+1)/files.length)*45)
+    await new Promise(r=>setTimeout(r,20))
+  }
+  return parsed
+}
+
+function analyze(parsed){
+  const tables=new Map(), columns=[], fileSummaries=[], rows=[]
+  for(const f of parsed){
+    const H=f.headers
+    const tableField=pickField(H,["table_name","테이블명","테이블","tbl_nm","table","테이블한글명","table_nm","데이터셋명"])
+    const colField=pickField(H,["column_name","컬럼명","컬럼","col_nm","field","필드명","column_nm","항목명"])
+    const domainField=pickField(H,["domain","도메인","domain_name","도메인명","분류","category","카테고리"])
+    const valueField=pickField(H,["value","값","sample","샘플","예시","distinct_value","대표값","값예시"])
+    const descField=pickField(H,["description","설명","비고","comment","컬럼설명","테이블설명","정의"])
+    const catField=pickField(H,["카테고리","category","대분류","중분류","소분류","분류명"])
+    fileSummaries.push({file:f.file,sizeMB:(f.size/1024/1024).toFixed(1),readMB:(f.readBytes/1024/1024).toFixed(1),sampled:f.sampled,segments:f.segments,rows:f.data.length,cols:H.length,tableField,colField,domainField,valueField,catField,error:f.error||""})
+    for(const r of f.data){
+      const table=getAny(r,[tableField,pickField(H,["table_id","테이블ID","dataset"])]) || `${f.file.replace(/\.csv$/i,"")}_table`
+      const column=getAny(r,[colField,pickField(H,["column_id","컬럼ID","name","명칭"])])
+      const domainRaw=getAny(r,[domainField])
+      const value=getAny(r,[valueField])
+      const desc=getAny(r,[descField])
+      const category=getAny(r,[catField])
+      const text=[table,column,domainRaw,value,desc,category,Object.values(r).slice(0,8).join(" ")].join(" ")
+      const inf=inferDomain(text)
+      const domain=domainRaw && inferDomain(domainRaw).score ? inferDomain(domainRaw).domain : inf.domain
+      if(!tables.has(table)) tables.set(table,{name:table,files:new Set(),domains:new Set(),cols:new Set(),categories:new Set(),rows:0,keys:new Set(),examples:[]})
+      const t=tables.get(table); t.files.add(f.file); t.domains.add(domain); if(column)t.cols.add(column); if(category)t.categories.add(category); t.rows++; if(t.examples.length<3)t.examples.push(text.slice(0,150))
+      if(/id|코드|번호|키|key/i.test(column)) t.keys.add(column)
+      if(column) columns.push({file:f.file,table,column,domain,domainRaw,value,desc,category,text,profile:valueProfile([value,desc,domainRaw,category].filter(Boolean))})
+      rows.push({file:f.file,table,column,domain,value,desc,category,text})
+    }
+  }
+  const tableList=[...tables.values()].map(t=>({name:t.name,files:[...t.files],domains:[...t.domains],cols:[...t.cols],categories:[...t.categories],rows:t.rows,keys:[...t.keys],examples:t.examples}))
+  const domainCounts={}; columns.forEach(c=>domainCounts[c.domain]=(domainCounts[c.domain]||0)+1)
+  const result={parsed,fileSummaries,tables:tableList,columns,rows,domainCounts}
+  result.domainDictionary=findDomainDictionary(result)
+  result.columnRules=findColumnRules(result)
+  result.valueRules=findValueRules(result)
+  result.associations=findAssociations(result)
+  result.tableLinks=findTableLinks(result)
+  result.masterTables=findMasterTables(result)
+  result.businessRules=findBusinessRules(result)
+  result.categoryValidation=findCategoryValidation(result)
+  return result
+}
+
+function findDomainDictionary(R){
+  return Object.entries(R.domainCounts).map(([domain,count])=>{
+    const cols=R.columns.filter(c=>c.domain===domain).map(c=>c.column)
+    const unique=[...new Set(cols)].slice(0,20)
+    const action={
+      "지역/주소":"행정구역, 주소, 좌표 컬럼의 표준 도메인 정의",
+      "시간/기준일":"기준일자, 등록일자, 갱신일자의 표준 날짜 형식 정의",
+      "기관/시설":"기관명, 시설명, 관리기관의 마스터 참조 기준 정의",
+      "코드/분류":"코드값, 코드명, 분류체계의 표준 코드 사전 정의",
+      "수요/실적":"건수, 인원, 금액, 실적 지표의 단위와 기준시점 정의",
+      "개인/민감":"개인정보 및 민감정보 컬럼의 접근통제/비식별 기준 정의",
+      "값/속성":"값 설명, 여부, 상태 등 속성 컬럼의 표준값 정의",
+      "일반":"미분류 컬럼의 도메인 재분류 필요"
+    }[domain]||"표준 도메인 정의 필요"
+    return {domain,count,examples:unique,action}
+  }).sort((a,b)=>b.count-a.count)
+}
+function findColumnRules(R){
+  const groups=new Map()
+  for(const c of R.columns){
+    const key=canon(c.column); if(key.length<2) continue
+    if(!groups.has(key)) groups.set(key,{standard:c.column,domain:c.domain,items:[],tables:new Set(),files:new Set(),values:new Set()})
+    const g=groups.get(key); g.items.push(c); g.tables.add(c.table); g.files.add(c.file); if(c.value)g.values.add(c.value)
+  }
+  return [...groups.values()].filter(g=>g.items.length>=2||g.tables.size>=2).map(g=>({
+    standard:g.standard,domain:g.domain,count:g.items.length,tables:[...g.tables].slice(0,12),files:[...g.files].slice(0,8),values:[...g.values].slice(0,8),
+    rule:`${g.standard} 계열 컬럼은 ${g.domain} 표준 도메인으로 관리하고 명칭/값 형식을 통일`
+  })).sort((a,b)=>b.count-a.count).slice(0,40)
+}
+function findValueRules(R){
+  const out=[]
+  for(const c of R.columns){
+    const issues=[]
+    if(c.domain==="시간/기준일" && c.profile.type!=="날짜형") issues.push("날짜형 값 형식 확인")
+    if(c.domain==="코드/분류" && !["코드형","범주형"].includes(c.profile.type)) issues.push("코드값/코드명 분리 확인")
+    if(c.domain==="지역/주소" && c.profile.type!=="주소형" && !/(시|군|구|동|읍|면|로|길)/.test(c.text)) issues.push("주소/행정구역 정합성 확인")
+    if(c.domain==="수요/실적" && !["숫자형","범주형"].includes(c.profile.type)) issues.push("수요/실적 지표의 단위와 숫자형 여부 확인")
+    if(c.domain==="개인/민감") issues.push("개인/민감정보 접근통제 및 비식별 기준 확인")
+    if(/여부/.test(c.column) && !/(Y|N|예|아니오|true|false|0|1)/i.test(c.text)) issues.push("여부 컬럼 표준값 확인")
+    if(issues.length) out.push({...c,issues})
+  }
+  return out.slice(0,100)
+}
+function findAssociations(R){
+  const combo=new Map()
+  for(const t of R.tables){
+    const ds=t.domains.filter(d=>d!=="일반").sort()
+    for(let i=0;i<ds.length;i++){
+      for(let j=i+1;j<ds.length;j++){
+        const key=ds[i]+" + "+ds[j]
+        if(!combo.has(key)) combo.set(key,{combo:key,count:0,tables:[]})
+        const x=combo.get(key); x.count++; if(x.tables.length<12)x.tables.push(t.name)
+      }
+    }
+  }
+  return [...combo.values()].sort((a,b)=>b.count-a.count).slice(0,30)
+}
+function findTableLinks(R){
+  const res=[]
+  for(let i=0;i<R.tables.length;i++){
+    for(let j=i+1;j<R.tables.length;j++){
+      const a=R.tables[i], b=R.tables[j]
+      const sharedDomains=a.domains.filter(d=>d!=="일반"&&b.domains.includes(d))
+      const sharedCols=a.cols.filter(c=>b.cols.some(x=>canon(x)===canon(c))).slice(0,10)
+      const sharedKeys=a.keys.filter(k=>b.keys.some(x=>canon(x)===canon(k))).slice(0,10)
+      if(sharedDomains.length>=2 || sharedCols.length>=1 || sharedKeys.length>=1){
+        const score=sharedDomains.length*20+sharedCols.length*15+sharedKeys.length*25
+        res.push({a:a.name,b:b.name,sharedDomains,sharedCols,sharedKeys,score,
+          reason: sharedKeys.length? "PK/FK 후보 키가 공통으로 발견됨" : sharedCols.length? "동일/유사 컬럼 기반 연계 후보" : "공통 도메인 조합 기반 연계 후보"
+        })
+      }
+    }
+  }
+  return res.sort((a,b)=>b.score-a.score).slice(0,60)
+}
+function findMasterTables(R){
+  return R.tables.map(t=>{
+    let score=0, reasons=[]
+    if(t.keys.length){score+=30;reasons.push("식별자/코드/번호 컬럼 보유")}
+    if(t.domains.includes("기관/시설")){score+=25;reasons.push("기관/시설 기준 정보 가능")}
+    if(t.domains.includes("지역/주소")){score+=20;reasons.push("지역/주소 기준 정보 가능")}
+    if(t.domains.includes("코드/분류")){score+=25;reasons.push("코드/분류 기준 정보 가능")}
+    if(t.cols.length>=5 && t.rows>=2){score+=10;reasons.push("복수 컬럼 구조 보유")}
+    return {name:t.name,score,reasons,keys:t.keys,domains:t.domains,cols:t.cols.slice(0,12)}
+  }).filter(x=>x.score>=40).sort((a,b)=>b.score-a.score).slice(0,40)
+}
+function findBusinessRules(R){
+  const rules=[]
+  const add=(cond,rule,evidence)=>{if(cond)rules.push({rule,evidence,count:cond})}
+  add(R.domainCounts["지역/주소"],"주소/지역 컬럼은 행정구역 단위로 분리·표준화되어야 한다.","지역/주소 도메인 반복 발견")
+  add(R.domainCounts["시간/기준일"],"기준일자/등록일자 컬럼은 표준 날짜 형식과 갱신주기를 가져야 한다.","시간/기준일 도메인 반복 발견")
+  add(R.domainCounts["기관/시설"],"기관명/시설명 컬럼은 기관·시설 마스터와 매핑되어야 한다.","기관/시설 도메인 반복 발견")
+  add(R.domainCounts["코드/분류"],"코드 컬럼은 코드값과 코드명을 분리하고 코드 사전을 참조해야 한다.","코드/분류 도메인 반복 발견")
+  add(R.domainCounts["수요/실적"],"수요/실적 지표는 단위와 기준시점을 함께 관리해야 한다.","수요/실적 도메인 반복 발견")
+  add(R.valueRules.filter(x=>x.domain==="개인/민감").length,"개인/민감 가능 컬럼은 접근권한과 비식별 기준을 적용해야 한다.","개인/민감 후보 발견")
+  return rules.sort((a,b)=>b.count-a.count)
+}
+function findCategoryValidation(R){
+  return R.tables.map(t=>{
+    const dominant=t.domains.filter(d=>d!=="일반")
+    const cat=t.categories.join(", ")||"-"
+    let risk="낮음", issue="카테고리와 도메인 구성을 추가 확인"
+    if(dominant.length===0){risk="높음"; issue="대표 도메인이 식별되지 않아 카테고리 분류 검증 필요"}
+    else if(t.categories.length>1){risk="중간"; issue="복수 카테고리에 걸친 테이블로 분류 기준 확인 필요"}
+    else if(t.domains.includes("개인/민감")){risk="중간"; issue="개인/민감 도메인이 포함되어 분류 및 보안 기준 확인 필요"}
+    return {table:t.name,category:cat,domains:dominant,risk,issue}
+  }).filter(x=>x.risk!=="낮음").slice(0,50)
+}
+
+function table(rows,heads,fn){
+  if(!rows.length) return `<div class="notice warn">표시할 결과가 없습니다.</div>`
+  return `<table><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>`+
+  rows.map((r,i)=>`<tr>${fn(r,i).map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")+`</tbody></table>`
+}
+function render(){
+  const R=RESULT
+  $("summaryCard").style.display="block"; $("resultCard").style.display="block"; setBar(100)
+  $("metrics").innerHTML=[
+    ["분석 파일",R.parsed.length],["복원 테이블",R.tables.length],["컬럼 후보",R.columns.length],["대표 도메인",R.domainDictionary.length],
+    ["컬럼 표준화 후보",R.columnRules.length],["값 정합성 후보",R.valueRules.length],["테이블 연계 후보",R.tableLinks.length],["마스터 후보",R.masterTables.length]
+  ].map(([k,v])=>`<div class="metric"><b>${fmt(v)}</b><span>${esc(k)}</span></div>`).join("")
+  const tabs=[
+    ["final","최종 요약"],["req","과제 요구 대응"],["domain","대표 도메인"],["column","컬럼 거버넌스"],
+    ["value","값 정합성"],["assoc","도메인/값 연관성"],["link","테이블 연계·PK/FK"],["master","마스터 테이블"],
+    ["rule","업무규칙"],["category","분류 정합성"],["files","파일 진단"],["script","발표문"]
+  ]
+  $("tabs").innerHTML=tabs.map((t,i)=>`<button class="${i?'':'active'}" onclick="showTab('${t[0]}',this)">${t[1]}</button>`).join("")
+  $("tabContents").innerHTML=tabs.map((t,i)=>`<div id="tab_${t[0]}" class="tab ${i?'':'active'}"></div>`).join("")
+  renderFinal(R);renderReq(R);renderDomain(R);renderColumn(R);renderValue(R);renderAssoc(R);renderLink(R);renderMaster(R);renderRule(R);renderCategory(R);renderFiles(R);renderScript(R)
+}
+function showTab(id,btn){document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));$("tab_"+id).classList.add("active");btn.classList.add("active")}
+
+function renderFinal(R){
+  $("tab_final").innerHTML=`
+  <div class="notice ok"><b>최종 결론</b><br>
+  공공데이터포털 정밀데이터지도 데이터를 분석하여 플랫폼 내 반복 도메인, 컬럼명 혼재, 값 형식 검증 대상, 테이블 연계 가능성, 마스터 테이블 후보, 업무규칙 후보를 도출했다.</div>
+  <h3>보고서용 핵심 문장</h3>
+  <pre>본 프로젝트는 공공데이터포털 1,000개 테이블의 정밀데이터지도 데이터를 분석하여, 컬럼 도메인/값 정합성, 컬럼 도메인/값 연관성, 공통 대표 도메인, 테이블 연계 후보, PK/FK 후보, 업무규칙 후보를 도출함으로써 데이터 플랫폼의 거버넌스 지능화를 위한 인사이트를 제시하였다.</pre>
+  <h3>최종 산출물 6개</h3>
+  ${table([
+    ["1","대표 도메인 사전 후보",`${fmt(R.domainDictionary.length)}개 도메인 축`],
+    ["2","컬럼 표준화 후보",`${fmt(R.columnRules.length)}개 후보`],
+    ["3","값 정합성 검증 규칙 후보",`${fmt(R.valueRules.length)}개 후보`],
+    ["4","도메인/값 연관성 후보",`${fmt(R.associations.length)}개 조합`],
+    ["5","테이블 연계 및 PK/FK 후보",`${fmt(R.tableLinks.length)}개 후보`],
+    ["6","마스터 테이블 및 업무규칙 후보",`${fmt(R.masterTables.length)}개 / ${fmt(R.businessRules.length)}개`],
+  ],["번호","산출물","분석 결과"],r=>r.map(x=>`<span class="wrap">${esc(x)}</span>`))}
+  <div class="notice warn">결과는 정밀데이터지도 기반의 탐색 후보이며, 운영 적용 전에는 실제 값 정합성, 참조무결성, 결측률, 중복률, 최신성 검증이 필요하다.</div>`
+}
+function renderReq(R){
+  $("tab_req").innerHTML=`
+  <h2>교수님 과제 요구 대응표</h2>
+  ${table([
+    ["컬럼 도메인/값 정합성 측정","값 형식 진단, 도메인-값 불일치 후보 탐색",`${fmt(R.valueRules.length)}개 값 정합성 후보`],
+    ["컬럼 거버넌스 규칙 탐사","유사 컬럼명 군집화와 표준 컬럼명 후보 도출",`${fmt(R.columnRules.length)}개 컬럼 표준화 후보`],
+    ["컬럼 도메인/값 연관성 탐사","같은 테이블 내 도메인 조합 동시출현 분석",`${fmt(R.associations.length)}개 연관 조합`],
+    ["공통/대표 도메인 발견 및 도메인 사전 표준화","지역/시간/기관/코드/수요 등 대표 도메인 축 도출",`${fmt(R.domainDictionary.length)}개 대표 도메인`],
+    ["마스터테이블 & 임시테이블, 테이블 연관성 발견","식별자/코드/기관/지역 중심 마스터 후보 및 테이블 연계 후보 탐색",`${fmt(R.masterTables.length)}개 마스터 후보, ${fmt(R.tableLinks.length)}개 연계 후보`],
+    ["PK&FK 연계테이블 거버넌스 지식 탐사","ID, 코드, 번호, 키 컬럼 기반 연결 후보 탐색",`연계 후보 탭 참조`],
+    ["단일/연계테이블 업무규칙 발견","반복 도메인을 관리 규칙으로 변환",`${fmt(R.businessRules.length)}개 업무규칙 후보`],
+    ["카테고리 계층구조의 테이블 분류 정합성 측정/검증","카테고리와 도메인 구성의 위험 후보 표시",`${fmt(R.categoryValidation.length)}개 검증 후보`],
+  ],["교수님 요구","HTML 분석 기능","결과"],r=>r.map(x=>`<span class="wrap">${esc(x)}</span>`))}`
+}
+function renderDomain(R){
+  $("tab_domain").innerHTML=`<h2>대표 도메인 사전 후보</h2>`+
+  table(R.domainDictionary,["순위","대표 도메인","컬럼 수","컬럼 예시","도메인 사전화 방향"],(r,i)=>[
+    fmt(i+1),pill(r.domain,r.domain==="일반"?"gray":"blue"),fmt(r.count),`<span class="wrap">${esc(r.examples.join(", "))}</span>`,`<span class="wrap">${esc(r.action)}</span>`
+  ])
+}
+function renderColumn(R){
+  $("tab_column").innerHTML=`<h2>컬럼 거버넌스 규칙 / 표준화 후보</h2>`+
+  table(R.columnRules,["순위","표준 컬럼 후보","대표 도메인","출현 수","관련 테이블","거버넌스 규칙"],(r,i)=>[
+    fmt(i+1),`<b>${esc(r.standard)}</b>`,pill(r.domain,"purple"),fmt(r.count),`<span class="wrap">${esc(r.tables.join(", "))}</span>`,`<span class="wrap">${esc(r.rule)}</span>`
+  ])
+}
+function renderValue(R){
+  $("tab_value").innerHTML=`<h2>컬럼 도메인/값 정합성 검증 후보</h2>`+
+  table(R.valueRules,["순위","테이블","컬럼","도메인","값 형식","값 예시","검증 이슈"],(r,i)=>[
+    fmt(i+1),`<span class="wrap">${esc(r.table)}</span>`,`<b>${esc(r.column)}</b>`,pill(r.domain,"amber"),esc(r.profile.type),`<span class="wrap">${esc(r.profile.examples.join(", "))}</span>`,`<span class="wrap">${esc(r.issues.join(" / "))}</span>`
+  ])
+}
+function renderAssoc(R){
+  $("tab_assoc").innerHTML=`<h2>컬럼 도메인/값 연관성 후보</h2>
+  <div class="notice">같은 테이블에서 함께 등장하는 대표 도메인 조합을 계산하여, 테이블 연계 및 업무규칙 후보로 활용한다.</div>`+
+  table(R.associations,["순위","도메인 조합","등장 테이블 수","테이블 예시","해석"],(r,i)=>[
+    fmt(i+1),`<b>${esc(r.combo)}</b>`,fmt(r.count),`<span class="wrap">${esc(r.tables.join(", "))}</span>`,`<span class="wrap">반복 등장하는 도메인 조합으로 표준 관리 규칙 또는 연계 후보로 검토</span>`
+  ])
+}
+function renderLink(R){
+  $("tab_link").innerHTML=`<h2>테이블 연계 및 PK/FK 후보</h2>`+
+  table(R.tableLinks,["순위","테이블 A","테이블 B","공통 도메인","공통 컬럼","PK/FK 후보 키","점수","해석"],(r,i)=>[
+    fmt(i+1),`<span class="wrap">${esc(r.a)}</span>`,`<span class="wrap">${esc(r.b)}</span>`,
+    `<span class="wrap">${r.sharedDomains.map(x=>pill(x,"blue")).join("")||"-"}</span>`,
+    `<span class="wrap">${esc(r.sharedCols.join(", ")||"-")}</span>`,
+    `<span class="wrap">${esc(r.sharedKeys.join(", ")||"-")}</span>`,fmt(r.score),`<span class="wrap">${esc(r.reason)}</span>`
+  ])
+}
+function renderMaster(R){
+  $("tab_master").innerHTML=`<h2>마스터 테이블 후보</h2>`+
+  table(R.masterTables,["순위","테이블","점수","대표 도메인","키 후보","선정 이유","컬럼 예시"],(r,i)=>[
+    fmt(i+1),`<span class="wrap"><b>${esc(r.name)}</b></span>`,fmt(r.score),
+    `<span class="wrap">${r.domains.map(x=>pill(x,"green")).join("")}</span>`,
+    `<span class="wrap">${esc(r.keys.join(", ")||"-")}</span>`,
+    `<span class="wrap">${esc(r.reasons.join(" / "))}</span>`,
+    `<span class="wrap">${esc(r.cols.join(", "))}</span>`
+  ])
+}
+function renderRule(R){
+  $("tab_rule").innerHTML=`<h2>단일/연계 테이블 업무규칙 후보</h2>`+
+  table(R.businessRules,["순위","업무규칙 후보","근거","근거 수"],(r,i)=>[
+    fmt(i+1),`<span class="wrap"><b>${esc(r.rule)}</b></span>`,`<span class="wrap">${esc(r.evidence)}</span>`,fmt(r.count)
+  ])
+}
+function renderCategory(R){
+  $("tab_category").innerHTML=`<h2>카테고리 계층구조의 테이블 분류 정합성 검증 후보</h2>`+
+  table(R.categoryValidation,["순위","테이블","카테고리","대표 도메인","위험도","검증 이슈"],(r,i)=>[
+    fmt(i+1),`<span class="wrap">${esc(r.table)}</span>`,`<span class="wrap">${esc(r.category)}</span>`,
+    `<span class="wrap">${r.domains.map(x=>pill(x,"blue")).join("")||"-"}</span>`,
+    pill(r.risk,r.risk==="높음"?"red":"amber"),`<span class="wrap">${esc(r.issue)}</span>`
+  ])
+}
+function renderFiles(R){
+  $("tab_files").innerHTML=`<h2>분석 파일 진단</h2>`+
+  table(R.fileSummaries,["파일","전체 MB","읽은 MB","분석 방식","샘플 구간","행","컬럼","테이블 필드","컬럼 필드","도메인 필드","값 필드","카테고리 필드"],r=>[
+    `<b>${esc(r.file)}</b>`,esc(r.sizeMB),esc(r.readMB),r.sampled?pill("앞·중간·뒤 샘플","amber"):pill("전체","green"),
+    `<span class="wrap">${esc(r.segments||"-")}</span>`,fmt(r.rows),fmt(r.cols),esc(r.tableField||"-"),esc(r.colField||"-"),esc(r.domainField||"-"),esc(r.valueField||"-"),esc(r.catField||"-")
+  ])+`<div class="notice warn">대용량 파일은 앞·중간·뒤 구간을 층화 샘플링했다. 보고서에는 이 분석 조건을 명시한다.</div>`
+}
+function renderScript(R){
+  $("tab_script").innerHTML=`<h2>발표문</h2>
+<pre>안녕하세요. 저희 팀은 공공데이터포털 1,000개 테이블에 대한 정밀데이터지도 데이터를 이용하여 데이터 플랫폼의 거버넌스 지식 탐사를 수행했습니다.
+
+과제 요구사항은 크게 두 가지였습니다. 첫째, 플랫폼 내 컬럼 도메인과 값 관련 거버넌스 특성 인사이트를 발견하는 것입니다. 둘째, 단일 테이블과 연계 테이블의 특성을 분석하여 마스터 테이블, 테이블 연관성, PK/FK 후보, 업무규칙, 카테고리 분류 정합성 검증 방안을 도출하는 것입니다.
+
+이를 위해 저희는 컬럼명, 도메인명, 값 예시, 테이블명, 카테고리 정보를 지역/주소, 시간/기준일, 기관/시설, 코드/분류, 수요/실적과 같은 대표 도메인으로 일반화했습니다. 이후 유사 컬럼명 군집화, 값 형식 진단, 도메인 동시출현 분석, 테이블 유사도 분석, 키 후보 탐색을 수행했습니다.
+
+분석 결과, 대표 도메인 사전 후보 ${fmt(R.domainDictionary.length)}개, 컬럼 표준화 후보 ${fmt(R.columnRules.length)}개, 값 정합성 검증 후보 ${fmt(R.valueRules.length)}개, 테이블 연계 후보 ${fmt(R.tableLinks.length)}개, 마스터 테이블 후보 ${fmt(R.masterTables.length)}개, 업무규칙 후보 ${fmt(R.businessRules.length)}개를 도출했습니다.
+
+본 프로젝트의 핵심 결론은 공공데이터 플랫폼을 개별 테이블 단위로만 관리하기보다, 반복적으로 나타나는 도메인과 연결 키를 기준으로 표준 도메인 사전, 컬럼 표준화 규칙, 값 정합성 검증 규칙, 테이블 연계 후보, 마스터 테이블 후보를 체계적으로 관리해야 한다는 것입니다.
+
+다만 본 분석은 정밀데이터지도 기반 탐색 분석이므로, 실제 운영 적용 전에는 후보 컬럼과 후보 테이블에 대해 값 정합성, 참조무결성, 결측률, 중복률, 최신성 검증이 추가로 필요합니다.</pre>`
+}
+async function run(){
+  resetAll()
+  const files=[...$("files").files]
+  if(!files.length){alert("CSV 파일을 선택하세요.");return}
+  const parsed=await readFiles(files)
+  setBar(55); log("분석 계산 중...")
+  RESULT=analyze(parsed)
+  render()
+  log("완료")
+}
+function downloadReport(){
+  if(!RESULT){alert("먼저 분석을 실행하세요.");return}
+  const html="<!doctype html>\n"+document.documentElement.outerHTML
+  const blob=new Blob([html],{type:"text/html;charset=utf-8"})
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="public_data_governance_knowledge_report.html"; a.click(); URL.revokeObjectURL(a.href)
+}
+</script>
+</body>
+</html>

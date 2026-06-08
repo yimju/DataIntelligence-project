@@ -1,0 +1,23 @@
+# 대용량 데이터 파일
+smartcity_selected.csv
+SC_Dynamic_우선수집.csv
+SC_활용신청_URL목록.csv
+SC_활용신청_URL목록_결과.csv
+smartcity_column_map.csv
+smartcity_errors.csv
+데이터지도_데이터.zip
+
+# PDF (강의자료)
+*.pdf
+
+# 기타
+*.docx
+*.zip
+*.pptx
+*.MP4
+*.mp4
+*.png
+
+# 팀숙제/팀프로젝트 폴더
+팀숙제_3-3_강임주/
+팀프로젝트/
