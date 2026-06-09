@@ -1,0 +1,34 @@
+﻿id,방법,rule,conf,근거,BR분류
+BR-FD-01,함수적 종속관계(FD),"IF   [사고다발지역 ID 존재]
+THEN [위도 MUST NOT NULL]
+AND  [경도 MUST NOT NULL]",100% (FD신뢰도=1.0),"다발지역ID → 위도/경도 완전 FD 확인 (8,381건 전수)",데이터 무결성 BR
+BR-FD-02,함수적 종속관계(FD),"IF   [사고 종류 = CHILD]
+THEN [대상 = 어린이 MUST]
+IF   [사고 종류 = OLDMAN]
+THEN [대상 = 노인 MUST]",100% (FD신뢰도=1.0),"사고종류 → 대상 완전 FD: CHILD→어린이, OLDMAN→노인 (8,381건)",도메인 표준 BR
+BR-FD-03,함수적 종속관계(FD),"IF   [시설 ID 존재]
+THEN [시설명 MUST NOT NULL]
+AND  [시설 주소 MUST NOT NULL]",100% (FD신뢰도=1.0),"시설ID → 시설명/시설주소 완전 FD (8,381건 전수)",참조 무결성 BR
+BR-JAC-01,자카드 유사도,"IF   [도시 간 PM10 측정 데이터 연계]
+THEN [측정 도메인 표준화 MUST]
+AND  [범위 Jaccard ≥ 0.7 이상일 때만 연계 허용]",현재 서울↔대구 Jaccard=0.409 (기준 미달),서울 PM10(0~554) ↔ 대구 PM10(0~300) 범위 불일치,도메인 표준화 BR
+BR-JAC-02,자카드 유사도(공간),"IF   [CCTV ↔ 사고다발지역 공간 Jaccard < 0.5]
+THEN [해당 구역 CCTV 재배치 MUST]
+AND  [Priority = 긴급]",현재 충주CCTV ↔ 충북사고지역 위도 Jaccard=0.134,CCTV 커버 범위와 사고발생 범위 불일치 (87.1% 미커버),공간 거버넌스 BR
+BR-FP-01,이산화(L0-L4) + FP-growth,"IF   [PM10 이산화 레벨 ∈ {L3(상), L4(최대)}]
+THEN [취약계층 알림 MUST 발송]
+AND  [측정→발송 지연 MUST ≤ 1시간]",support=3.8% | 근거: PM10>80 실제 발생률,"서울 227,760건 이산화 → L3/L4 = 나쁨 이상 구간",이산화 기반 운영 BR
+BR-FP-02,엔트로피 기반 변수 선택,"IF   [대기오염 데이터 컬럼]
+THEN [구분(Entropy=4.70), PM10_L(2.46) 우선 관리]
+AND  [요일(Entropy=0.86) = 저정보 컬럼 → 거버넌스 제외 가능]",구분 Entropy=4.700 (최고) | 요일 0.862 (보조),엔트로피 기반 변수 선택: 5개 컬럼 중 4개 선택,데이터 품질 선택 BR
+BR-RI-01,참조 무결성,"IF   [스마트시티 위치 인프라 데이터]
+     (CCTV, 사고지점, 쉼터, 측정소)
+THEN [위도 참조 완전성 MUST = 100%]
+AND  [경도 참조 완전성 MUST = 100%]","현재 충주CCTV 100%, 사고지점 100%, 쉼터 100%",연계 참조 무결성: 위치데이터 누락 시 공간분석 불가,참조 무결성 BR
+BR-RI-02,도메인 유효성(Validity),"IF   [대기오염 측정값 NULL]
+THEN [해당 측정소 장비 점검 MUST]
+AND  [NULL율 임계값 = 5% 초과 시 자동 알림]",대구 실측 NULL율=2.2% (기준 충족) | 서울 0.1%,품질관리 PDF 유효성(Validity) 지표 기준,데이터 유효성 BR
+BR-CROSS-01,FD + 공간 Jaccard,"IF   [사고종류=SCHOOLZONE]
+AND  [인근 2km CCTV Jaccard < 0.5 (미커버)]
+THEN [스쿨존 CCTV 신규 설치 Priority=1]
+AND  [설치 후 FD 재검증 MUST]","SCHOOLZONE 사고 394건 | 평균 CCTV거리 44,380m",SCHOOLZONE이 CCTV로부터 가장 먼 사고 유형,크로스도메인 복합 BR
